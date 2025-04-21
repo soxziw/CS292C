@@ -47,8 +47,8 @@ let rec aexp (env : env) (e : Lang.aexp) : expr =
         | Mod -> Integer.mk_mod ctx e1 e2
       in
       mk (aexp env e1) (aexp env e2)
-  | Select { arr; idx } -> Todo.at_level 2 ~msg:"Smt.aexp: Select"
-  | Store { arr; idx; value } -> Todo.at_level 2 ~msg:"Smt.aexp: Store"
+  | Select { arr; idx } -> Z3Array.mk_select ctx (aexp env arr) (aexp env idx)
+  | Store { arr; idx; value } -> Z3Array.mk_store ctx (aexp env arr) (aexp env idx) (aexp env value)
 
 (** Convert a [formula] to a Z3 expression *)
 let rec formula (env : env) (f : Lang.formula) : expr =
@@ -96,8 +96,7 @@ let check_validity (gamma : Lang.gamma) (f : Lang.formula) : status =
   let solver = Solver.mk_solver ctx None in
   (* TODO: translate the verification condition into a Z3 constraint *)
   let c =
-    Todo.at_level 1 ~msg:"Smt.check_validity: c"
-      ~dummy:(formula [] (FBool true))
+    formula (List.map ~f:(convert) gamma) (FNot f)
   in
   Logs.debug (fun m ->
       m "Checking satisfiability of formula:\n%!%s"
@@ -118,4 +117,7 @@ let check_validity (gamma : Lang.gamma) (f : Lang.formula) : status =
     |> Option.value_exn ~error:(Error.of_string "Solver returned no model")
     |> Model.to_string
   in
-  Todo.at_level 1 ~msg:"Smt.check_validity: validity status" ~dummy:Unknown
+  match result with
+  | SATISFIABLE -> Invalid (model_str())
+  | UNSATISFIABLE -> Valid
+  | UNKNOWN -> Unknown

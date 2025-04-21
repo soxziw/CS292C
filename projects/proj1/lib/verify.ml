@@ -6,20 +6,40 @@ module Subst = struct
 
   (** [aexp x e c] substitutes all occurrences of [x] in [c] with [e] *)
   let rec aexp (x : string) (e : aexp) (c : aexp) : aexp =
-    match c with _ -> Todo.at_level 1 ~msg:"Verify.Subst.aexp"
+    match c with
+    | Int i -> Int i
+    | Aop (aop, aa, ab) -> Aop (aop, aexp x e aa, aexp x e ab)
+    | Var s -> if String.equal x s then e else Var s
+    | Select { arr; idx } -> Select { arr = (aexp x e arr); idx = (aexp x e idx)}
+    | Store { arr; idx; value } -> Store { arr = (aexp x e arr); idx = (aexp x e idx); value = (aexp x e value)}
 
   (** [bexp x e c] substitutes all occurrences of [x] in [c] with [e] *)
   let rec bexp (x : string) (e : aexp) (c : bexp) : bexp =
-    match c with _ -> Todo.at_level 1 ~msg:"Verify.Subst.bexp"
+    match c with
+    | Bool b -> Bool b
+    | Comp (comp, aa, ab) -> Comp (comp, aexp x e aa, aexp x e ab)
+    | Not (ba) -> Not (bexp x e ba)
+    | And (ba, bb) -> And (bexp x e ba, bexp x e bb)
+    | Or (ba, bb) -> Or (bexp x e ba, bexp x e bb)
 
   (** [formula x e f] substitutes all occurrences of [x] in [f] with [e] *)
   let rec formula (x : string) (e : aexp) (f : formula) : formula =
-    match f with _ -> Todo.at_level 1 ~msg:"Verify.Subst.formula"
+    match f with
+    | FBool b -> FBool b
+    | FComp (comp, aa, ab) -> FComp (comp, aexp x e aa, aexp x e ab)
+    | FQ (q, s, fa) -> if String.equal x s then FQ (q, s, fa) else FQ (q, s, formula x e fa)
+    | FNot (fa) -> FNot (formula x e fa)
+    | FConn (conn, fa, fb) -> FConn (conn, formula x e fa, formula x e fb)
 end
 
 (** Lift a [bexp] into a [formula] *)
 let rec bexp_to_formula (b : Lang.bexp) : Lang.formula =
-  Todo.at_level 1 ~msg:"Verify.bexp_to_formula"
+  match b with
+    | Bool b -> FBool b
+    | Comp (comp, aa, ab) -> FComp (comp, aa, ab)
+    | Not (ba) -> FNot (bexp_to_formula ba)
+    | And (ba, bb) -> FConn (And, bexp_to_formula ba, bexp_to_formula bb)
+    | Or (ba, bb) -> FConn (Or, bexp_to_formula ba, bexp_to_formula bb)
 
 (** Make a verifier for a method in a difny program *)
 module Make (S : sig
@@ -54,7 +74,15 @@ struct
 
   (** Compute the list of modified variables in a statement *)
   let rec modified (s : stmt) : string list =
-    match s with _ -> Todo.at_level 1 ~msg:"Verify.modified"
+    match s with
+    | Assign { lhs; rhs = _ } -> [ lhs ]
+    | If { cond = _; els; thn } -> (modified_block thn) @ (modified_block els)
+    | While { cond = _; inv = _; body } -> modified_block body
+    | Call { lhs; callee = _; args = _ } -> [ lhs ]
+    | Havoc x -> [x]
+    | Assume _ -> []
+    | Assert _ -> []
+    | Print _ -> []
 
   (** Compute the list of unique modified variables in a sequence of statements *)
   and modified_block (stmts : block) : string list =
@@ -67,10 +95,54 @@ struct
   (** Compile a statement into a sequence of guarded commands *)
   let rec compile (c : stmt) : gcom list =
     match c with
-    | Assign { lhs; rhs } -> Todo.at_level 1 ~msg:"Verify.compile: Assign"
-    | If { cond; els; thn } -> Todo.at_level 1 ~msg:"Verify.compile: If"
-    | While { cond; inv; body } -> Todo.at_level 1 ~msg:"Verify.compile: While"
-    | Call { lhs; callee; args } -> Todo.at_level 3 ~msg:"Verify.compile: Call"
+    | Assign { lhs; rhs } -> (
+      let lhs_ty = Utils.ty_exn (gamma ()) ~of_:lhs in
+      let tmp = fresh_var lhs_ty ~hint:lhs in
+      [Assume (FComp (Eq, Var tmp, Var lhs));
+      Havoc lhs;
+      Assume (FComp(Eq, Var lhs, (Subst.aexp lhs (Var tmp) rhs)))])
+    | If { cond; els; thn } -> (
+      let thn_list = List.fold_left ~f:(fun acc s -> acc @ (compile s)) ~init:[] thn in
+      let els_list = List.fold_left ~f:(fun acc s -> acc @ (compile s)) ~init:[] els in
+      [Choose(
+        Seq(Assume (bexp_to_formula cond)::thn_list),
+        Seq(Assume (FNot (bexp_to_formula cond))::els_list)
+      )])
+    | While { cond; inv; body } -> (
+      let body_list = List.fold_left ~f:(fun acc s -> acc @ (compile s)) ~init:[] body in
+      let inv_assert_list = List.fold_left ~f:(fun acc s -> (Assert s)::acc) ~init:[] inv in
+      let inv_assume_list = List.fold_left ~f:(fun acc s -> (Assume s)::acc) ~init:[] inv in
+      let havoc_variables = List.fold_left ~f:(fun acc s -> (Havoc s)::acc) ~init:[] (modified_block body) in
+      let continue = Seq ((Assume (bexp_to_formula cond)::body_list) @ inv_assert_list @ [Assume (FBool false)]) in
+      let break = Seq [Assume (FNot (bexp_to_formula cond))] in
+      inv_assert_list @ havoc_variables @ inv_assume_list @ [Choose (continue, break)])
+    | Call { lhs; callee; args } -> (
+      let callee_meth = 
+        match List.find ~f:(fun m -> String.equal m.id callee) S.prog with
+        | Some m -> m
+        | None -> failwith (Fmt.str "Method %s not found" callee)
+      in
+      let param_vars = List.map2_exn ~f:(fun (x, _) arg -> (x, arg)) callee_meth.params args in
+      let (ret_name, ret_ty) = callee_meth.returns in
+      let ret_var = fresh_var ret_ty ~hint:ret_name in
+      let pre_conds = 
+        List.map callee_meth.requires ~f:(fun pre ->
+          List.fold param_vars ~init:pre ~f:(fun acc (param_name, fresh) ->
+            Subst.formula param_name fresh acc))
+      in
+      let post_conds = 
+        List.map callee_meth.ensures ~f:(fun post ->
+          let post_with_params = 
+            List.fold param_vars ~init:post ~f:(fun acc (param_name, fresh) ->
+              Subst.formula param_name fresh acc)
+          in
+          Subst.formula ret_name (Var ret_var) post_with_params)
+      in
+      let pre_asserts = List.map pre_conds ~f:(fun pre -> Assert pre) in
+      let post_assumes = List.map post_conds ~f:(fun post -> Assume post) in
+      
+      pre_asserts @ post_assumes @ (compile (Assign { lhs = lhs; rhs = Var ret_var }))
+    )
     | Havoc x -> [ Havoc x ]
     | Assume f -> [ Assume f ]
     | Assert f -> [ Assert f ]
@@ -83,11 +155,17 @@ struct
   (** Compute weakest-pre given a guarded command and a post formula *)
   let rec wp (g : gcom) (f : formula) : formula =
     match g with
-    | Assume f' -> Todo.at_level 1 ~msg:"Verify.wp: Assume"
-    | Assert f' -> Todo.at_level 1 ~msg:"Verify.wp: Assert"
-    | Havoc x -> Todo.at_level 1 ~msg:"Verify.wp: Havoc"
-    | Seq cs -> Todo.at_level 1 ~msg:"Verify.wp: Seq"
-    | Choose (c1, c2) -> Todo.at_level 1 ~msg:"Verify.wp: Choose"
+    | Assume f' -> FConn (Imply, f', f)
+    | Assert f' -> FConn (And, f', f)
+    | Havoc x -> (
+      let x_ty = Utils.ty_exn (gamma ()) ~of_:x in
+      let tmp = fresh_var x_ty ~hint:x in
+      Subst.formula x (Var tmp) f)
+    | Seq cs -> (
+      match cs with
+      | [] -> f
+      | x::xs -> wp x (wp_seq xs f))
+    | Choose (c1, c2) -> FConn (And, wp c1 f, wp c2 f)
 
   (** Propagate the post-condition backwards through a sequence of guarded
       commands using [wp] *)
@@ -101,9 +179,11 @@ struct
     Logs.debug (fun m -> m "%a" Pretty.meth S.meth);
 
     (* compile method to guarded commands *)
-    let gs =
-      compile_block (Todo.at_level 2 ~msg:"compile_block" ~dummy:S.meth.body)
-    in
+    let pre_conds = List.map ~f:(fun s -> Assume s) S.meth.requires in
+    let body_gs = compile_block (S.meth.body) in
+    let (ret_name, _) = S.meth.returns in
+    let post_conds = List.map ~f:(fun s -> Assert (Subst.formula ret_name S.meth.ret s)) S.meth.ensures in
+    let gs = pre_conds @ body_gs @ post_conds in
     Logs.debug (fun m -> m "Guarded commands:");
     Logs.debug (fun m -> m "%a" Fmt.(vbox (list Pretty.gcom)) gs);
 
