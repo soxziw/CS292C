@@ -32,6 +32,42 @@ module Subst = struct
     | FConn (conn, fa, fb) -> FConn (conn, formula x e fa, formula x e fb)
 end
 
+module MulSubst = struct
+  open Lang
+
+  (** [aexp m c] substitutes all occurrences of [x] in [c] with [e] *)
+  let rec aexp (m : (string * aexp) list) (c : aexp) : aexp =
+    match c with
+    | Int i -> Int i
+    | Aop (aop, aa, ab) -> Aop (aop, aexp m aa, aexp m ab)
+    | Var s -> (
+      match List.find_map ~f:(fun (x, e) -> if String.equal x s then Some e else None) m with
+      | Some e -> e
+      | None -> Var s)
+    | Select { arr; idx } -> Select { arr = (aexp m arr); idx = (aexp m idx)}
+    | Store { arr; idx; value } -> Store { arr = (aexp m arr); idx = (aexp m idx); value = (aexp m value)}
+
+  (** [bexp m c] substitutes all occurrences of [x] in [c] with [e] *)
+  let rec bexp (m : (string * aexp) list) (c : bexp) : bexp =
+    match c with
+    | Bool b -> Bool b
+    | Comp (comp, aa, ab) -> Comp (comp, aexp m aa, aexp m ab)
+    | Not (ba) -> Not (bexp m ba)
+    | And (ba, bb) -> And (bexp m ba, bexp m bb)
+    | Or (ba, bb) -> Or (bexp m ba, bexp m bb)
+
+  (** [formula m f] substitutes all occurrences of [x] in [f] with [e] *)
+  let rec formula (m : (string * aexp) list) (f : formula) : formula =
+    match f with
+    | FBool b -> FBool b
+    | FComp (comp, aa, ab) -> FComp (comp, aexp m aa, aexp m ab)
+    | FQ (q, s, fa) -> (
+      let remain_map = List.filter ~f:(fun (x, _) -> not (String.equal x s)) m in
+      FQ (q, s, formula remain_map fa))
+    | FNot (fa) -> FNot (formula m fa)
+    | FConn (conn, fa, fb) -> FConn (conn, formula m fa, formula m fb)
+end
+
 (** Lift a [bexp] into a [formula] *)
 let rec bexp_to_formula (b : Lang.bexp) : Lang.formula =
   match b with
@@ -125,19 +161,8 @@ struct
       let param_vars = List.map2_exn ~f:(fun (x, _) arg -> (x, arg)) callee_meth.params args in
       let (ret_name, ret_ty) = callee_meth.returns in
       let ret_var = fresh_var ret_ty ~hint:ret_name in
-      let pre_conds = 
-        List.map callee_meth.requires ~f:(fun pre ->
-          List.fold param_vars ~init:pre ~f:(fun acc (param_name, fresh) ->
-            Subst.formula param_name fresh acc))
-      in
-      let post_conds = 
-        List.map callee_meth.ensures ~f:(fun post ->
-          let post_with_params = 
-            List.fold param_vars ~init:post ~f:(fun acc (param_name, fresh) ->
-              Subst.formula param_name fresh acc)
-          in
-          Subst.formula ret_name (Var ret_var) post_with_params)
-      in
+      let pre_conds = List.map callee_meth.requires ~f:(fun f -> MulSubst.formula param_vars f) in
+      let post_conds = List.map callee_meth.ensures ~f:(fun f -> Subst.formula ret_name (Var ret_var) (MulSubst.formula param_vars f)) in
       let pre_asserts = List.map pre_conds ~f:(fun pre -> Assert pre) in
       let post_assumes = List.map post_conds ~f:(fun post -> Assume post) in
       
