@@ -58,6 +58,30 @@ struct
   (** Return the current list of conflicts *)
   let curr_conflicts () = Queue.to_list conflicts
 
+  let contains_lit (c : Clause.t) (l : Lit.t) : bool =
+    Clause.contains c l || Clause.contains c (Lit.negate l)
+
+  let sigma (level: int) (a: Assign.t) (c: Clause.t) (lits: Lit.t list) : int =
+    List.length (List.filter lits ~f:(fun l -> (contains_lit c l) && ((Assign.level_exn a l) = level)))
+
+  let rec omega (level: int) (a: Assign.t) (c: Clause.t) (implied: Lit.t list) (decision: Lit.t) (idx: int) : Clause.t =
+    if (sigma level a c (decision::implied)) = 1 then c
+    else (
+      match List.filter implied ~f:(fun l -> (contains_lit c l) && ((Assign.level_exn a l) = level) && (Option.is_some (Assign.antecedent a l))) with
+      | [] -> c
+      | l :: _ -> 
+        let new_c = Clause.resolve_exn c (if Clause.contains c l then l else (Lit.negate l)) (Option.value_exn (Assign.antecedent a l)) in
+        omega level a new_c (decision::implied) decision (idx+1)
+    )
+
+  let beta (omega: Clause.t) (a: Assign.t) : int =
+    let l = Set.to_list (Clause.vars omega) in 
+    let levels = List.map l ~f:(fun v -> Assign.level_exn a (Lit.make_pos v)) in
+    match List.sort levels ~compare:Int.descending with
+    | [] -> 0
+    | [_] -> 0
+    | _ :: second_max :: _ -> second_max
+
   (** [analyze level a unsat] analyzes the unsatisfiable clause [unsat],
       returning a conflict to learn, and a resolution proof of the conflict *)
   let analyze (level : int) (a : Assign.t) (unsat : Clause.t) :
@@ -66,8 +90,8 @@ struct
         m "analyze: level = %d, unsat clause = %a" level Clause.pp unsat);
     (* retrieve the decision and the trail of implied literals *)
     let { implied; decision } : Assign.Trail.t = Assign.trail_exn a level in
-    let conflict = Todo.part 2 "Cdcl.analyze: conflict" in
-    let beta = Todo.part 2 "Cdcl.analyze: conflict" in
+    let conflict = omega level a unsat implied decision 1 in
+    let beta = beta conflict a in
     let proof =
       Todo.part 3 "Cdcl.analyze: proof" ~dummy:(Proof.fact Clause.empty)
     in
@@ -120,7 +144,16 @@ struct
           Heuristics.best_unassigned vars s.a s.h
           |> Option.value_exn ~error:(Error.of_string "No unassigned variable")
         in
-        Todo.part 2 "Cdcl.solve: branching and backtracking"
+        let new_s = State.decide s decision in
+        try
+          solve new_s
+        with
+        | Backtrack b -> 
+          if b = s.level then
+            solve s
+          else
+            raise (Backtrack b)
+        | Restart -> raise Restart
 
   let rec run () : Solution.t =
     let s = State.init in

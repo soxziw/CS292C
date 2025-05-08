@@ -56,7 +56,9 @@ struct
           Logs.info (fun m -> m "Deciding %a" Lit.pp left);
           solve (State.decide s left)
         with Backtrack left_proof ->
-          Todo.part 1 "Dpll.solve: left branch unsat")
+          Logs.info (fun m -> m "Deciding %a" Lit.pp right);
+          solve (State.decide s right)
+    )
 
   (** Solving result *)
   let result : Solution.t =
