@@ -1,41 +1,45 @@
-use egg::{RecExpr, Id, Language};
+use egg::{RecExpr, Id, Language, EGraph};
 use std::collections::HashMap;
 use crate::math::Math;
+use crate::math::is_const;
 use std::fs;
 
 // Cost model for cryptographic operations
-pub struct CryptoCost {
-    // Cost weights for different operations
-    add_cost: u64,
-    sub_cost: u64,
-    mul_cost: u64,
-    square_cost: u64,
-    costs: HashMap<String, u64>,
+pub struct CryptoCost<'a> {
+    pub egraph: &'a EGraph<Math, ()>,
+    pub add_cost: u64,
+    pub sub_cost: u64,
+    pub mul_cost: u64,
+    pub square_cost: u64,
+    pub const_mul_cost: u64,
 }
 
-impl CryptoCost {
-    pub fn new(costs: HashMap<String, u64>) -> Self {
+impl<'a> CryptoCost<'a> {
+    pub fn new(egraph: &'a EGraph<Math, ()>, costs: HashMap<String, u64>) -> Self {
         let add_cost = *costs.get("add").unwrap_or(&1);
         let sub_cost = *costs.get("sub").unwrap_or(&1);
         let mul_cost = *costs.get("mul").unwrap_or(&10);
         let square_cost = *costs.get("square").unwrap_or(&6);
-        
+        let const_mul_cost = *costs.get("const_mul").unwrap_or(&4);
+
         CryptoCost {
+            egraph,
             add_cost,
             sub_cost,
             mul_cost,
             square_cost,
-            costs,
+            const_mul_cost,
         }
     }
     
-    pub fn default() -> Self {
+    pub fn default(egraph: &'a EGraph<Math, ()>) -> Self {
         let mut costs = HashMap::new();
         costs.insert("add".to_string(), 1);
         costs.insert("sub".to_string(), 1);
         costs.insert("mul".to_string(), 10);
         costs.insert("square".to_string(), 6);
-        Self::new(costs)
+        costs.insert("const_mul".to_string(), 4);
+        Self::new(egraph, costs)
     }
 
     pub fn cost_rec(&self, expr: &RecExpr<Math>) -> u64 {
@@ -51,9 +55,15 @@ impl CryptoCost {
             let op_cost = match node {
                 Math::Add(_) => self.add_cost,
                 Math::Sub(_) => self.sub_cost,
-                Math::Mul(_) => self.mul_cost,
+                Math::Mul([a, b]) => {
+                    if is_const(self.egraph, a) || is_const(self.egraph, b) {
+                        self.const_mul_cost
+                    } else {
+                        self.mul_cost
+                    }
+                }
                 Math::Square(_) => self.square_cost,
-                Math::Const(_) | Math::Var(_) => 0,
+                Math::Val(_) => 0,
             };
 
             costs[i] = op_cost + children_cost;
@@ -65,16 +75,17 @@ impl CryptoCost {
     // Implement Clone trait for CryptoCost
     pub fn clone(&self) -> Self {
         CryptoCost {
+            egraph: self.egraph,
             add_cost: self.add_cost,
             sub_cost: self.sub_cost,
             mul_cost: self.mul_cost,
             square_cost: self.square_cost,
-            costs: self.costs.clone(),
+            const_mul_cost: self.const_mul_cost,
         }
     }
 }
 
-impl egg::CostFunction<Math> for CryptoCost {
+impl<'a> egg::CostFunction<Math> for CryptoCost<'a> {
     type Cost = u64;
     
     fn cost<C>(&mut self, enode: &Math, mut children_costs: C) -> u64
@@ -86,15 +97,23 @@ impl egg::CostFunction<Math> for CryptoCost {
         match enode {
             Math::Add(_) => self.add_cost + children_cost,
             Math::Sub(_) => self.sub_cost + children_cost,
-            Math::Mul(_) => self.mul_cost + children_cost,
+            Math::Mul([a, b]) => {
+                let cost = if is_const(self.egraph, a) || is_const(self.egraph, b) {
+                    self.const_mul_cost
+                } else {
+                    self.mul_cost
+                };
+
+                cost + children_cost
+            }
             Math::Square(_) => self.square_cost + children_cost,
-            Math::Const(_) | Math::Var(_) => 0,
+            Math::Val(_) => 0,
         }
     }
 }
 
 // Load cost model from a file
-pub fn load_cost_model_from_file(filename: &str) -> CryptoCost {
+pub fn load_cost_model_from_file<'a>(egraph: &'a EGraph<Math, ()>, filename: &str) -> CryptoCost<'a> {
     let mut costs = HashMap::new();
     
     match fs::read_to_string(filename) {
@@ -117,5 +136,5 @@ pub fn load_cost_model_from_file(filename: &str) -> CryptoCost {
         }
     }
     
-    CryptoCost::new(costs)
+    CryptoCost::new(egraph, costs)
 }

@@ -25,30 +25,6 @@ fn main() -> io::Result<()> {
     if args.len() > 2 {
         cost_file = Some(&args[2]);
     }
-    
-    // If files are provided, use them to load custom rules and costs
-    // Otherwise, use defaults
-    let rules = match rules_file {
-        Some(filename) => {
-            println!("Loading rules from file: {}", filename);
-            load_rules_from_file(filename)
-        },
-        None => {
-            println!("Using default rules...");
-            default_rules()
-        },
-    };
-    
-    let cost_model = match cost_file {
-        Some(filename) => {
-            println!("Loading cost model from file: {}", filename);
-            load_cost_model_from_file(filename)
-        },
-        None => {
-            println!("Using default cost model...");
-            CryptoCost::default()
-        },
-    };
 
     loop{
         println!("Finite Field Expression Optimizer");
@@ -62,15 +38,39 @@ fn main() -> io::Result<()> {
 
         println!("Optimizing expression: {}", expr_str);
 
-        // Parse expression as RecExpr (not Pattern)
         let expr = RecExpr::<Math>::from_str(expr_str).expect("Failed to parse expression");
-
-        // Calculate original cost
-        let original_cost = cost_model.cost_rec(&expr);
 
         // Run egg optimizer
         let mut runner = Runner::default().with_expr(&expr);
+        
+        // If files are provided, use them to load custom rules and costs
+        // Otherwise, use defaults
+        let rules = match rules_file {
+            Some(filename) => {
+                println!("Loading rules from file: {}", filename);
+                load_rules_from_file(filename)
+            },
+            None => {
+                println!("Using default rules...");
+                default_rules()
+            },
+        };
+
         runner = runner.run(&rules);
+        
+        let cost_model = match cost_file {
+            Some(filename) => {
+                println!("Loading cost model from file: {}", filename);
+                load_cost_model_from_file(&runner.egraph, filename)
+            },
+            None => {
+                println!("Using default cost model...");
+                CryptoCost::default(&runner.egraph)
+            },
+        };
+
+        // Calculate original cost
+        let original_cost = cost_model.cost_rec(&expr);
 
         // Extract best-cost expression
         let extractor = Extractor::new(&runner.egraph, cost_model.clone());
