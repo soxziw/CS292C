@@ -6,6 +6,19 @@ use egg::rewrite;
 // Default set of rewrite rules for finite field arithmetic
 pub fn default_rules() -> Vec<Rewrite<Math, ()>> {
     vec![
+        // Identity rules
+        rewrite!("add-zero"; "(+ ?a 0)" => "?a"),
+        rewrite!("zero-add"; "(+ 0 ?a)" => "?a"),
+        rewrite!("mul-one"; "(* ?a 1)" => "?a"),
+        rewrite!("one-mul"; "(* 1 ?a)" => "?a"),
+        rewrite!("mul-zero"; "(* ?a 0)" => "0"),
+        rewrite!("zero-mul"; "(* 0 ?a)" => "0"),
+        
+        // Subtraction rules
+        rewrite!("sub-zero"; "(- ?a 0)" => "?a"),
+        rewrite!("sub-self"; "(- ?a ?a)" => "0"),
+        rewrite!("sub-to-add"; "(- ?a ?b)" => "(+ ?a (* -1 ?b))"),
+        
         // Commutativity
         rewrite!("comm-add"; "(+ ?a ?b)" => "(+ ?b ?a)"),
         rewrite!("comm-mul"; "(* ?a ?b)" => "(* ?b ?a)"),

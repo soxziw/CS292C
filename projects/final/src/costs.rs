@@ -1,4 +1,4 @@
-use egg::{RecExpr, Id, Language, EGraph};
+use egg::{Id, EGraph, Language};
 use std::collections::HashMap;
 use crate::math::Math;
 use crate::math::is_const;
@@ -42,36 +42,6 @@ impl<'a> CryptoCost<'a> {
         Self::new(egraph, costs)
     }
 
-    pub fn cost_rec(&self, expr: &RecExpr<Math>) -> u64 {
-        let mut costs = vec![0u64; expr.as_ref().len()];
-
-        for (i, node) in expr.as_ref().iter().enumerate() {
-            let children_cost = node
-                .children()
-                .iter()
-                .map(|&id| costs[usize::from(id)])
-                .sum::<u64>();
-
-            let op_cost = match node {
-                Math::Add(_) => self.add_cost,
-                Math::Sub(_) => self.sub_cost,
-                Math::Mul([a, b]) => {
-                    if is_const(self.egraph, a) || is_const(self.egraph, b) {
-                        self.const_mul_cost
-                    } else {
-                        self.mul_cost
-                    }
-                }
-                Math::Square(_) => self.square_cost,
-                Math::Val(_) => 0,
-            };
-
-            costs[i] = op_cost + children_cost;
-        }
-
-        *costs.last().unwrap()
-    }
-
     // Implement Clone trait for CryptoCost
     pub fn clone(&self) -> Self {
         CryptoCost {
@@ -88,7 +58,7 @@ impl<'a> CryptoCost<'a> {
 impl<'a> egg::CostFunction<Math> for CryptoCost<'a> {
     type Cost = u64;
     
-    fn cost<C>(&mut self, enode: &Math, mut children_costs: C) -> u64
+     fn cost<C>(&mut self, enode: &Math, mut children_costs: C) -> u64
     where
         C: FnMut(Id) -> u64,
     {
