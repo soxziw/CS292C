@@ -1,3 +1,10 @@
+TODOS:
+1. Implement final cost model
+2. How to apply model on different fields/How to find what field we are in
+3. Write correct rewrite rules
+4. Presentation
+
+
 # Final Track B: Formal Optimization for Finite Field Cryptographic Computations
 
 ## Project Background
