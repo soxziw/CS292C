@@ -1,0 +1,9 @@
+# Format: operation=cost
+
+# Basic operations
+add=1
+sub=1
+const_mul=4
+square=6
+mul=10
+inversion=80
