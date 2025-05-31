@@ -6,4 +6,4 @@ sub=1
 const_mul=4
 square=6
 mul=10
-inversion=80
+inv=80
