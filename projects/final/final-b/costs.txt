@@ -1,7 +1,0 @@
-# Format: operation=cost
-
-# Basic operations
-add=1
-sub=1
-mul=10
-square=6
