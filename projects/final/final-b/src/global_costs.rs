@@ -1,4 +1,4 @@
-use egg::{RecExpr, Id, Runner, Extractor, CostFunction, Language};
+use egg::{RecExpr, Id, Runner, Extractor, Language};
 use std::collections::HashSet;
 use std::str::FromStr;
 use crate::math::Math;
@@ -71,7 +71,7 @@ pub fn update_costs(expr: &RecExpr<Math>, seen: &mut HashSet<String>, total_cost
         let subexpr = subexpr_to_string(&expr, Id::from(id));
         if !subexpr_seen(&subexpr, &seen) {
             seen.insert(subexpr.clone());
-            let c = cost_model.clone().cost(node, |_| 0);
+            let c = cost_model.clone().cost_of_node(node, expr);
             cost += c;
         }
     }
