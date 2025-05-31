@@ -19,6 +19,9 @@ pub fn default_rules() -> Vec<Rewrite<Math, ()>> {
         rewrite!("sub-self"; "(- ?a ?a)" => "0"),
         rewrite!("sub-to-add"; "(- ?a ?b)" => "(+ ?a (* -1 ?b))"),
         
+        //add rules
+        rewrite!("add-cancel"; "(+ ?a (* -1 ?a))" => "0"),
+
         // Commutativity
         rewrite!("comm-add"; "(+ ?a ?b)" => "(+ ?b ?a)"),
         rewrite!("comm-mul"; "(* ?a ?b)" => "(* ?b ?a)"),
