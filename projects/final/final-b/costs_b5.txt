@@ -1,0 +1,9 @@
+# Format: operation=cost
+
+# Basic operations
+add=0.1
+sub=0.1
+mul=1.5
+square=1
+inv=20
+exp=80

@@ -8,6 +8,7 @@ define_language! {
         "*" = Mul([Id; 2]),
         "^2" = Square(Id),
         "inv" = Inverse(Id),
+        "**" = Exp([Id; 2]),
         Val(Symbol),
     }
 }

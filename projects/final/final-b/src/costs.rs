@@ -13,6 +13,7 @@ pub struct CryptoCost<'a> {
     pub square_cost: f64,
     pub const_mul_cost: f64,
     pub inv_cost: f64,
+    pub exp_cost: f64,
 }
 
 impl<'a> CryptoCost<'a> {
@@ -23,6 +24,7 @@ impl<'a> CryptoCost<'a> {
         let square_cost = *costs.get("square").unwrap_or(&6.0);
         let const_mul_cost = *costs.get("const_mul").unwrap_or(&4.0);
         let inv_cost = *costs.get("inv").unwrap_or(&80.0);
+        let exp_cost = *costs.get("exp").unwrap_or(&80.0);
 
         CryptoCost {
             egraph,
@@ -32,6 +34,7 @@ impl<'a> CryptoCost<'a> {
             square_cost,
             const_mul_cost,
             inv_cost,
+            exp_cost,
         }
     }
     
@@ -43,6 +46,7 @@ impl<'a> CryptoCost<'a> {
         costs.insert("square".to_string(), 6.0);
         costs.insert("const_mul".to_string(), 4.0);
         costs.insert("inv".to_string(), 80.0);
+        costs.insert("exp".to_string(), 80.0);
         Self::new(egraph, costs)
     }
 
@@ -56,6 +60,7 @@ impl<'a> CryptoCost<'a> {
             square_cost: self.square_cost,
             const_mul_cost: self.const_mul_cost,
             inv_cost: self.inv_cost,
+            exp_cost: self.exp_cost,
         }
     }
 
@@ -73,6 +78,7 @@ impl<'a> CryptoCost<'a> {
             Math::Square(_) => self.square_cost,
             Math::Val(_) => 0.0,
             Math::Inverse(_) => self.inv_cost,
+            Math::Exp(_) => self.exp_cost,
         }
     }
 }
@@ -101,6 +107,7 @@ impl<'a> egg::CostFunction<Math> for CryptoCost<'a> {
             Math::Square(_) => self.square_cost + children_cost,
             Math::Val(_) => 0.0,
             Math::Inverse(_) => self.inv_cost + children_cost,
+            Math::Exp(_) => self.exp_cost + children_cost,
         }
     }
 }
