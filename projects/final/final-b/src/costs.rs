@@ -1,28 +1,30 @@
 use egg::{Id, EGraph, Language, RecExpr};
 use std::collections::HashMap;
 use crate::math::Math;
-use crate::math::{is_const_from_expr, is_const_from_egraph};
+use crate::math::{is_const_from_expr, is_const_from_egraph, is_exp_of_const_w, is_w_from_egraph};
 use std::fs;
 
 // Cost model for cryptographic operations
 pub struct CryptoCost<'a> {
     pub egraph: &'a EGraph<Math, ()>,
-    pub add_cost: u64,
-    pub sub_cost: u64,
-    pub mul_cost: u64,
-    pub square_cost: u64,
-    pub const_mul_cost: u64,
-    pub inv_cost: u64,
+    pub add_cost: f64,
+    pub sub_cost: f64,
+    pub mul_cost: f64,
+    pub square_cost: f64,
+    pub const_mul_cost: f64,
+    pub inv_cost: f64,
+    pub exp_cost: f64,
 }
 
 impl<'a> CryptoCost<'a> {
-    pub fn new(egraph: &'a EGraph<Math, ()>, costs: HashMap<String, u64>) -> Self {
-        let add_cost = *costs.get("add").unwrap_or(&1);
-        let sub_cost = *costs.get("sub").unwrap_or(&1);
-        let mul_cost = *costs.get("mul").unwrap_or(&10);
-        let square_cost = *costs.get("square").unwrap_or(&6);
-        let const_mul_cost = *costs.get("const_mul").unwrap_or(&4);
-        let inv_cost = *costs.get("inv").unwrap_or(&80);
+    pub fn new(egraph: &'a EGraph<Math, ()>, costs: HashMap<String, f64>) -> Self {
+        let add_cost = *costs.get("add").unwrap_or(&1.0);
+        let sub_cost = *costs.get("sub").unwrap_or(&1.0);
+        let mul_cost = *costs.get("mul").unwrap_or(&10.0);
+        let square_cost = *costs.get("square").unwrap_or(&6.0);
+        let const_mul_cost = *costs.get("const_mul").unwrap_or(&4.0);
+        let inv_cost = *costs.get("inv").unwrap_or(&80.0);
+        let exp_cost = *costs.get("exp").unwrap_or(&80.0);
 
         CryptoCost {
             egraph,
@@ -32,17 +34,19 @@ impl<'a> CryptoCost<'a> {
             square_cost,
             const_mul_cost,
             inv_cost,
+            exp_cost,
         }
     }
     
     pub fn default(egraph: &'a EGraph<Math, ()>) -> Self {
         let mut costs = HashMap::new();
-        costs.insert("add".to_string(), 1);
-        costs.insert("sub".to_string(), 1);
-        costs.insert("mul".to_string(), 10);
-        costs.insert("square".to_string(), 6);
-        costs.insert("const_mul".to_string(), 4);
-        costs.insert("inv".to_string(), 80);
+        costs.insert("add".to_string(), 1.0);
+        costs.insert("sub".to_string(), 1.0);
+        costs.insert("mul".to_string(), 10.0);
+        costs.insert("square".to_string(), 6.0);
+        costs.insert("const_mul".to_string(), 4.0);
+        costs.insert("inv".to_string(), 80.0);
+        costs.insert("exp".to_string(), 80.0);
         Self::new(egraph, costs)
     }
 
@@ -56,10 +60,11 @@ impl<'a> CryptoCost<'a> {
             square_cost: self.square_cost,
             const_mul_cost: self.const_mul_cost,
             inv_cost: self.inv_cost,
+            exp_cost: self.exp_cost,
         }
     }
 
-    pub fn cost_of_node(&self, node: &Math, expr: &RecExpr<Math>) -> u64 {
+    pub fn cost_of_node(&self, node: &Math, expr: &RecExpr<Math>) -> f64 {
         match node {
             Math::Add(_) => self.add_cost,
             Math::Sub(_) => self.sub_cost,
@@ -71,20 +76,28 @@ impl<'a> CryptoCost<'a> {
                 }
             },
             Math::Square(_) => self.square_cost,
-            Math::Val(_) => 0,
+            Math::Val(_) => 0.0,
             Math::Inverse(_) => self.inv_cost,
+            Math::Exp([a, b]) => {
+                if is_exp_of_const_w(expr, a) {
+                    0.0
+                } else {
+                    self.exp_cost
+                }
+            }
+            _ => 0.0,
         }
     }
 }
 
 impl<'a> egg::CostFunction<Math> for CryptoCost<'a> {
-    type Cost = u64;
+    type Cost = f64;
     
-     fn cost<C>(&mut self, enode: &Math, mut children_costs: C) -> u64
+     fn cost<C>(&mut self, enode: &Math, mut children_costs: C) -> f64
     where
-        C: FnMut(Id) -> u64,
+        C: FnMut(Id) -> f64,
     {
-        let children_cost: u64 = enode.fold(0, |sum, id| sum + children_costs(id));
+        let children_cost: f64 = enode.fold(0.0, |sum, id| sum + children_costs(id));
         
         match enode {
             Math::Add(_) => self.add_cost + children_cost,
@@ -99,8 +112,17 @@ impl<'a> egg::CostFunction<Math> for CryptoCost<'a> {
                 cost + children_cost
             }
             Math::Square(_) => self.square_cost + children_cost,
-            Math::Val(_) => 0,
+            Math::Val(_) => 0.0,
             Math::Inverse(_) => self.inv_cost + children_cost,
+            Math::Exp([a, b]) => {
+                let cost = if is_w_from_egraph(self.egraph, a) {
+                    0.0
+                } else {
+                    self.exp_cost
+                };
+                cost + children_cost
+            }
+            Math::Fp6(_) => children_cost,
         }
     }
 }
@@ -117,7 +139,7 @@ pub fn load_cost_model_from_file<'a>(egraph: &'a EGraph<Math, ()>, filename: &st
                     let parts: Vec<&str> = line.split('=').collect();
                     if parts.len() == 2 {
                         let op = parts[0].trim().to_string();
-                        if let Ok(cost) = parts[1].trim().parse::<u64>() {
+                        if let Ok(cost) = parts[1].trim().parse::<f64>() {
                             costs.insert(op, cost);
                         }
                     }

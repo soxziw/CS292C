@@ -65,7 +65,7 @@ fn subexpr_seen(subexpr: &String, seen: &HashSet<String>) -> bool {
     false
 }
 
-pub fn update_costs(expr: &RecExpr<Math>, seen: &mut HashSet<String>, total_cost: u64, cost_model: CryptoCost) -> u64 {
+pub fn update_costs(expr: &RecExpr<Math>, seen: &mut HashSet<String>, total_cost: f64, cost_model: CryptoCost) -> f64 {
     let mut cost = total_cost;
     for (id, node) in expr.as_ref().iter().enumerate() {
         let subexpr = subexpr_to_string(&expr, Id::from(id));

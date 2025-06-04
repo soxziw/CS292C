@@ -8,6 +8,8 @@ define_language! {
         "*" = Mul([Id; 2]),
         "^2" = Square(Id),
         "inv" = Inverse(Id),
+        "**" = Exp([Id; 2]),
+        "Fp6" = Fp6([Id; 6]),
         Val(Symbol),
     }
 }
@@ -37,4 +39,29 @@ pub fn is_const_from_expr(expr: &RecExpr<Math>, id: &Id) -> bool {
         },
         _ => false
     }
+}
+pub fn is_exp_of_const_w(expr: &RecExpr<Math>, id: &Id) -> bool {
+    let node = &expr[*id];
+    match node {
+        Math::Val(sym) => {
+            let name = sym.as_str();
+            // Check if it's a number or one of the special variables
+            println!("Checking if {} is w", name);
+            name == "w"
+        },
+        _ => false
+    }
+}
+pub fn is_w_from_egraph(egraph: &EGraph<Math, ()>, id: &Id) -> bool {
+    // Check if the node is a constant (pure number) or a special variable (xi, gamma, beta)
+    egraph[*id].nodes.iter().any(|node| {
+        match node {
+            Math::Val(sym) => {
+                let name = sym.as_str();
+                // Check if it's a number or one of the special variables
+                name == "w"
+            },
+            _ => false
+        }
+    })
 }

@@ -61,14 +61,22 @@ fn parse_rule(rule_str: &str) -> Option<Rewrite<Math, ()>> {
     let rhs = parts[1].trim();
     
     match (Pattern::<Math>::from_str(lhs), Pattern::<Math>::from_str(rhs)) {
-        (Ok(lhs_pattern), Ok(rhs_pattern)) => {
-            Some(Rewrite::new(name, lhs_pattern, rhs_pattern).unwrap())
-        },
-        _ => {
-            eprintln!("Failed to parse rule: {}", rule_str);
-            None
-        }
+    (Ok(lhs_pattern), Ok(rhs_pattern)) => {
+        Some(Rewrite::new(name, lhs_pattern, rhs_pattern).unwrap())
+    },
+    (Err(lhs_err), Err(rhs_err)) => {
+        eprintln!("Failed to parse both sides.\nLHS error: {}\nRHS error: {}", lhs_err, rhs_err);
+        None
+    },
+    (Err(lhs_err), _) => {
+        eprintln!("Failed to parse LHS: {}", lhs_err);
+        None
+    },
+    (_, Err(rhs_err)) => {
+        eprintln!("Failed to parse RHS: {}", rhs_err);
+        None
     }
+}
 }
 
 // Load rules from a file

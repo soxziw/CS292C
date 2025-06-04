@@ -81,7 +81,7 @@ fn main() -> io::Result<()> {
 
     // Calculate costs for all expressions
     let mut seen = HashSet::new();
-    let mut total_original_cost = 0;
+    let mut total_original_cost = 0.0;
     for expr in exprs.iter() {
         total_original_cost = update_costs(expr, &mut seen, total_original_cost, cost_model.clone());
     }
@@ -90,17 +90,17 @@ fn main() -> io::Result<()> {
     let extractor = Extractor::new(&runner.egraph, cost_model.clone());
     let mut best_exprs = vec![];
     let mut seen = HashSet::new();
-    let mut total_cost = 0;
+    let mut total_cost = 0.0;
     for root in runner.roots {
         let (_, expr) = extractor.find_best(root);
         total_cost = update_costs(&expr, &mut seen, total_cost, cost_model.clone());
         best_exprs.push(expr);
     }
 
-    if total_cost >= total_original_cost {
-        println!("No improvement found");
-        return Ok(());
-    }
+    // if total_cost >= total_original_cost {
+    //     println!("No improvement found");
+    //     return Ok(());
+    // }
 
     // Output
     println!("\nOptimization Results:");
@@ -120,4 +120,3 @@ fn main() -> io::Result<()> {
 
     Ok(())
 }
-
