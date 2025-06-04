@@ -1,0 +1,8 @@
+# Format: operation=cost
+
+# Basic operations
+add=0.1
+sub=0.1
+mul=1.5
+const_mul=0.8
+square=1.0

@@ -1,7 +1,7 @@
 use egg::{Id, EGraph, Language, RecExpr};
 use std::collections::HashMap;
 use crate::math::Math;
-use crate::math::{is_const_from_expr, is_const_from_egraph};
+use crate::math::{is_const_from_egraph, is_const_from_expr};
 use std::fs;
 
 // Cost model for cryptographic operations
@@ -59,48 +59,246 @@ impl<'a> CryptoCost<'a> {
         }
     }
 
-    pub fn cost_of_node(&self, node: &Math, expr: &RecExpr<Math>) -> f64 {
-        match node {
-            Math::Add(_) => self.add_cost,
-            Math::Sub(_) => self.sub_cost,
-            Math::Mul([a, b]) => {
-                if is_const_from_expr(expr, a) || is_const_from_expr(expr, b) {
-                    self.const_mul_cost
-                } else {
-                    self.mul_cost
-                }
-            },
-            Math::Square(_) => self.square_cost,
-            Math::Val(_) => 0.0,
-            Math::Inverse(_) => self.inv_cost,
+    pub fn cost_rec(&self, expr: &RecExpr<Math>) -> f64 {
+        let mut costs = vec![0.0; expr.as_ref().len()];
+
+        for (i, node) in expr.as_ref().iter().enumerate() {
+            let children_cost = node
+                .children()
+                .iter()
+                .map(|&id| costs[usize::from(id)] as f64)
+                .sum::<f64>();
+
+            let op_cost = match node {
+                Math::Add([a, b]) => {
+                    // Check if a and b are tuples
+                    let is_tuple_a = matches!(&expr[*a], Math::Tuple2(_) | Math::Tuple3(_));
+                    let is_tuple_b = matches!(&expr[*b], Math::Tuple2(_) | Math::Tuple3(_));
+                    
+                    if is_tuple_a || is_tuple_b {
+                        // For tuple addition, count costs based on tuple structure
+                        let mut tuple_add_cost = 2.0 * self.add_cost; // Default: two additions
+                        
+                        // Check if a is Tuple2(x, 0) or Tuple2(0, x)
+                        let a_is_special = match &expr[*a] {
+                            Math::Tuple2([x, y]) => {
+                                let is_zero_x = matches!(&expr[*x], Math::Val(s) if s.as_str() == "0");
+                                let is_zero_y = matches!(&expr[*y], Math::Val(s) if s.as_str() == "0");
+                                is_zero_x || is_zero_y
+                            },
+                            _ => false
+                        };
+                        
+                        // Check if b is Tuple2(x, 0) or Tuple2(0, x)
+                        let b_is_special = match &expr[*b] {
+                            Math::Tuple2([x, y]) => {
+                                let is_zero_x = matches!(&expr[*x], Math::Val(s) if s.as_str() == "0");
+                                let is_zero_y = matches!(&expr[*y], Math::Val(s) if s.as_str() == "0");
+                                is_zero_x || is_zero_y
+                            },
+                            _ => false
+                        };
+                        
+                        // If either a or b is special, only count one addition
+                        if a_is_special || b_is_special {
+                            tuple_add_cost = self.add_cost;
+                        }
+                        
+                        tuple_add_cost
+                    } else {
+                        // Regular addition cost
+                        self.add_cost
+                    }
+                },
+                Math::Sub([a, b]) => {
+                    // Check if a and b are tuples
+                    let is_tuple_a = matches!(&expr[*a], Math::Tuple2(_) | Math::Tuple3(_));
+                    let is_tuple_b = matches!(&expr[*b], Math::Tuple2(_) | Math::Tuple3(_));
+                    
+                    if is_tuple_a || is_tuple_b {
+                        // For tuple addition, count costs based on tuple structure
+                        let mut tuple_sub_cost = 2.0 * self.sub_cost; // Default: two additions
+                        
+                        // Check if a is Tuple2(x, 0) or Tuple2(0, x)
+                        let a_is_special = match &expr[*a] {
+                            Math::Tuple2([x, y]) => {
+                                let is_zero_x = matches!(&expr[*x], Math::Val(s) if s.as_str() == "0");
+                                let is_zero_y = matches!(&expr[*y], Math::Val(s) if s.as_str() == "0");
+                                is_zero_x || is_zero_y
+                            },
+                            _ => false
+                        };
+                        
+                        // Check if b is Tuple2(x, 0) or Tuple2(0, x)
+                        let b_is_special = match &expr[*b] {
+                            Math::Tuple2([x, y]) => {
+                                let is_zero_x = matches!(&expr[*x], Math::Val(s) if s.as_str() == "0");
+                                let is_zero_y = matches!(&expr[*y], Math::Val(s) if s.as_str() == "0");
+                                is_zero_x || is_zero_y
+                            },
+                            _ => false
+                        };
+                        
+                        // If either a or b is special, only count one addition
+                        if a_is_special || b_is_special {
+                            tuple_sub_cost = self.sub_cost;
+                        }
+                        
+                        tuple_sub_cost
+                    } else {
+                        // Regular addition cost
+                        self.sub_cost
+                    }
+                },
+                Math::Mul([a, b]) => {
+                    // Check if a and b are tuples
+                    let is_tuple_a = matches!(&expr[*a], Math::Tuple2(_) | Math::Tuple3(_));
+                    let is_tuple_b = matches!(&expr[*b], Math::Tuple2(_) | Math::Tuple3(_));
+                    
+                    if is_tuple_a || is_tuple_b {
+                        // For tuple addition, count costs based on tuple structure
+                        let mut tuple_mul_cost = 2.0 * self.mul_cost; // Default: two additions
+                        
+                        // Check if a is Tuple2(x, 0) or Tuple2(0, x)
+                        let a_is_special = match &expr[*a] {
+                            Math::Tuple2([x, y]) => {
+                                let is_zero_x = matches!(&expr[*x], Math::Val(s) if s.as_str() == "0");
+                                let is_zero_y = matches!(&expr[*y], Math::Val(s) if s.as_str() == "0");
+                                is_zero_x || is_zero_y
+                            },
+                            _ => false
+                        };
+                        
+                        // Check if b is Tuple2(x, 0) or Tuple2(0, x)
+                        let b_is_special = match &expr[*b] {
+                            Math::Tuple2([x, y]) => {
+                                let is_zero_x = matches!(&expr[*x], Math::Val(s) if s.as_str() == "0");
+                                let is_zero_y = matches!(&expr[*y], Math::Val(s) if s.as_str() == "0");
+                                is_zero_x || is_zero_y
+                            },
+                            _ => false
+                        };
+                        
+                        // If either a or b is special, only count one addition
+                        if a_is_special || b_is_special {
+                            tuple_mul_cost = self.mul_cost;
+                        }
+                        
+                        tuple_mul_cost
+                    } else {
+                        let cost = if is_const_from_expr(expr, a) || is_const_from_expr(expr, b) {
+                            self.const_mul_cost
+                        } else {
+                            self.mul_cost
+                        };
+                        
+                        cost
+                    }
+                },
+                Math::Square(_) => self.square_cost,
+                Math::Val(_) => 0.0,
+                Math::Inverse(_) => self.inv_cost,
+                Math::Tuple2(_) => 0.0,
+                Math::Tuple3(_) => 0.0,
+            };
+
+            costs[i] = op_cost + children_cost;
         }
+
+        *costs.last().unwrap()
     }
 }
 
 impl<'a> egg::CostFunction<Math> for CryptoCost<'a> {
     type Cost = f64;
     
-     fn cost<C>(&mut self, enode: &Math, mut children_costs: C) -> f64
+    fn cost<C>(&mut self, enode: &Math, mut children_costs: C) -> f64
     where
         C: FnMut(Id) -> f64,
     {
         let children_cost: f64 = enode.fold(0.0, |sum, id| sum + children_costs(id));
         
         match enode {
-            Math::Add(_) => self.add_cost + children_cost,
-            Math::Sub(_) => self.sub_cost + children_cost,
-            Math::Mul([a, b]) => {
-                let cost = if is_const_from_egraph(self.egraph, a) || is_const_from_egraph(self.egraph, b) {
-                    self.const_mul_cost
+            Math::Add([a, b]) => {
+                // Check if a and b are tuples
+                let is_tuple_a = self.egraph[*a].nodes.iter().any(|node| matches!(node, Math::Tuple2(_) | Math::Tuple3(_)));
+                let is_tuple_b = self.egraph[*b].nodes.iter().any(|node| matches!(node, Math::Tuple2(_) | Math::Tuple3(_)));
+                
+                if is_tuple_a || is_tuple_b {
+                    2.0 * self.add_cost + children_cost
                 } else {
-                    self.mul_cost
-                };
-
-                cost + children_cost
-            }
+                    // Regular addition cost
+                    self.add_cost + children_cost
+                }
+            },
+            Math::Sub([a, b]) => {
+                // Check if a and b are tuples
+                let is_tuple_a = self.egraph[*a].nodes.iter().any(|node| matches!(node, Math::Tuple2(_) | Math::Tuple3(_)));
+                let is_tuple_b = self.egraph[*b].nodes.iter().any(|node| matches!(node, Math::Tuple2(_) | Math::Tuple3(_)));
+                
+                if is_tuple_a || is_tuple_b {
+                    2.0 * self.sub_cost + children_cost
+                } else {
+                    // Regular addition cost
+                    self.sub_cost + children_cost
+                }
+            },
+            Math::Mul([a, b]) => {
+                // Check if a and b are tuples
+                let is_tuple_a = self.egraph[*a].nodes.iter().any(|node| matches!(node, Math::Tuple2(_) | Math::Tuple3(_)));
+                let is_tuple_b = self.egraph[*b].nodes.iter().any(|node| matches!(node, Math::Tuple2(_) | Math::Tuple3(_)));
+                
+                if is_tuple_a || is_tuple_b {
+                    // For tuple addition, count costs based on tuple structure
+                    let mut tuple_mul_cost = 2.0 * self.mul_cost; // Default: two additions
+                    
+                    // Check if a is Tuple2(x, 0) or Tuple2(0, x)
+                    let a_is_special = self.egraph[*a].nodes.iter().any(|node| {
+                        if let Math::Tuple2([x, y]) = node {
+                            let is_zero_x = self.egraph[*x].nodes.iter().any(|n| 
+                                matches!(n, Math::Val(s) if s.as_str() == "0"));
+                            let is_zero_y = self.egraph[*y].nodes.iter().any(|n| 
+                                matches!(n, Math::Val(s) if s.as_str() == "0"));
+                            is_zero_x || is_zero_y
+                        } else {
+                            false
+                        }
+                    });
+                    
+                    // Check if b is Tuple2(x, 0) or Tuple2(0, x)
+                    let b_is_special = self.egraph[*b].nodes.iter().any(|node| {
+                        if let Math::Tuple2([x, y]) = node {
+                            let is_zero_x = self.egraph[*x].nodes.iter().any(|n| 
+                                matches!(n, Math::Val(s) if s.as_str() == "0"));
+                            let is_zero_y = self.egraph[*y].nodes.iter().any(|n| 
+                                matches!(n, Math::Val(s) if s.as_str() == "0"));
+                            is_zero_x || is_zero_y
+                        } else {
+                            false
+                        }
+                    });
+                    
+                    // If either a or b is special, only count one addition
+                    if a_is_special || b_is_special {
+                        tuple_mul_cost = self.mul_cost;
+                    }
+                    
+                    tuple_mul_cost + children_cost
+                } else {
+                    let cost = if is_const_from_egraph(self.egraph, a) || is_const_from_egraph(self.egraph, b) {
+                        self.const_mul_cost
+                    } else {
+                        self.mul_cost
+                    };
+    
+                    cost + children_cost
+                }
+            },
             Math::Square(_) => self.square_cost + children_cost,
             Math::Val(_) => 0.0,
             Math::Inverse(_) => self.inv_cost + children_cost,
+            Math::Tuple2(_) => children_cost,
+            Math::Tuple3(_) => children_cost,
         }
     }
 }

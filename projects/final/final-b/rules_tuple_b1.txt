@@ -1,0 +1,54 @@
+# Commutativity
+(+ ?a ?b) => (+ ?b ?a)
+(* ?a ?b) => (* ?b ?a)
+
+# Associativity
+(+ ?a (+ ?b ?c)) => (+ (+ ?a ?b) ?c)
+(* ?a (* ?b ?c)) => (* (* ?a ?b) ?c)
+
+# Distributivity
+(* ?a (+ ?b ?c)) => (+ (* ?a ?b) (* ?a ?c))
+(+ (* ?a ?b) (* ?a ?c)) => (* ?a (+ ?b ?c))
+
+# Square identities
+(^2 ?a) => (* ?a ?a)
+(* ?a ?a) => (^2 ?a)
+
+# 2ab identity
+(* 2 (* ?a ?b)) => (- (^2 (+ ?a ?b)) (+ (^2 ?a) (^2 ?b)))
+(- (^2 (+ ?a ?b)) (+ (^2 ?a) (^2 ?b))) => (* 2 (* ?a ?b))
+
+# Karatsuba multiplication
+(+ (* ?a ?d) (* ?b ?c)) => (- (* (+ ?a ?b) (+ ?c ?d)) (+ (* ?a ?c) (* ?b ?d)))
+
+# Tuple2 Commutativity
+(+ (Tuple2 ?a ?b) (Tuple2 ?c ?d)) => (+ (Tuple2 ?c ?d) (Tuple2 ?a ?b))
+(* (Tuple2 ?a ?b) (Tuple2 ?c ?d)) => (* (Tuple2 ?c ?d) (Tuple2 ?a ?b))
+
+# Tuple2 Associativity
+(+ (Tuple2 ?a ?b) (+ (Tuple2 ?c ?d) (Tuple2 ?e ?f))) => (+ (+ (Tuple2 ?a ?b) (Tuple2 ?c ?d)) (Tuple2 ?e ?f))
+(* (Tuple2 ?a ?b) (* (Tuple2 ?c ?d) (Tuple2 ?e ?f))) => (* (* (Tuple2 ?a ?b) (Tuple2 ?c ?d)) (Tuple2 ?e ?f))
+
+# Tuple2 Distributivity
+(* (Tuple2 ?a ?b) (+ (Tuple2 ?c ?d) (Tuple2 ?e ?f))) => (+ (* (Tuple2 ?a ?b) (Tuple2 ?c ?d)) (* (Tuple2 ?a ?b) (Tuple2 ?e ?f)))
+(+ (* (Tuple2 ?a ?b) (Tuple2 ?c ?d)) (* (Tuple2 ?a ?b) (Tuple2 ?e ?f))) => (* (Tuple2 ?a ?b) (+ (Tuple2 ?c ?d) (Tuple2 ?e ?f)))
+
+# Tuple2 Addition Definition
+(+ (Tuple2 ?a ?b) (Tuple2 ?c ?d)) => (Tuple2 (+ ?a ?c) (+ ?b ?d))
+(Tuple2 (+ ?a ?c) (+ ?b ?d)) => (+ (Tuple2 ?a ?b) (Tuple2 ?c ?d))
+(Tuple2 ?a (+ ?b ?d)) => (+ (Tuple2 ?a ?b) (Tuple2 0 ?d))
+(Tuple2 (+ ?a ?c) ?b) => (+ (Tuple2 ?a ?b) (Tuple2 ?c 0))
+(Tuple2 ?a ?b) => (+ (Tuple2 ?a 0) (Tuple2 0 ?b))
+
+
+# Tuple2 Subtraction
+(- (Tuple2 ?a ?b) (Tuple2 ?c ?d)) => (Tuple2 (- ?a ?c) (- ?b ?d))
+(Tuple2 (- ?a ?c) (- ?b ?d)) => (- (Tuple2 ?a ?b) (Tuple2 ?c ?d))
+(Tuple2 ?a (- ?b ?d)) => (- (Tuple2 ?a ?b) (Tuple2 0 ?d))
+(Tuple2 (- ?a ?c) ?b) => (- (Tuple2 ?a ?b) (Tuple2 ?c 0))
+
+# Tuple2 Multiplication Definition
+
+# Tuple2 propogation
+(Tuple2 ?a (- 0 ?a)) => (Tuple2 ?a 0)
+(Tuple2 (- 0 ?a) ?a) => (Tuple2 ?a 0)

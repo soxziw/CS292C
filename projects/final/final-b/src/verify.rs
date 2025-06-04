@@ -1,117 +1,116 @@
-use egg::{EGraph, Pattern, RecExpr, Rewrite};
-use z3::{Config, Context, Solver, ast::{Ast, Bool, Int}};
+use egg::{EGraph, Id, Pattern, RecExpr, Rewrite};
+use z3::{Config, Context, Solver, ast::{Ast, Int}};
 use crate::math::Math;
 use crate::rules::{default_rules, load_rules_from_file};
 
-/// Verifies that a rewrite rule preserves equivalence using Z3 SMT solver
 pub fn verify_rule(rule: &Rewrite<Math, ()>) -> bool {
-    // Create Z3 context and solver
     let config = Config::new();
     let context = Context::new(&config);
     let solver = Solver::new(&context);
-    
-    // Extract left and right patterns from the rule
-    let lhs = &rule.searcher.get_pattern();
-    let rhs = &rule.applier.get_pattern();
-    
-    // Convert patterns to Z3 expressions
-    let lhs_expr = pattern_to_z3(lhs, &context);
-    let rhs_expr = pattern_to_z3(rhs, &context);
-    
-    // Check if lhs != rhs is satisfiable (meaning they're not equivalent)
+
+    let (lhs, rhs) = match extract_lhs_rhs(rule) {
+        Some(pair) => pair,
+        None => {
+            println!("Could not extract lhs/rhs from rule '{}'", rule.name);
+            return false;
+        }
+    };
+
+    let lhs_expr = expr_to_z3(lhs, &context);
+    let rhs_expr = expr_to_z3(rhs, &context);
+
     solver.assert(&lhs_expr._eq(&rhs_expr).not());
-    
+
     match solver.check() {
         z3::SatResult::Sat => {
-            println!("Rule '{}' is NOT valid. Counterexample: {:?}", rule.name(), solver.get_model());
+            println!("Rule '{}' is NOT valid. Counterexample: {:?}", rule.name, solver.get_model());
             false
         },
         z3::SatResult::Unsat => {
-            println!("Rule '{}' is valid.", rule.name());
+            println!("Rule '{}' is valid.", rule.name);
             true
         },
         z3::SatResult::Unknown => {
-            println!("Rule '{}' verification is inconclusive.", rule.name());
+            println!("Rule '{}' verification is inconclusive.", rule.name);
             false
         }
     }
 }
 
-/// Converts an egg Pattern to a Z3 expression
-fn pattern_to_z3<'a>(pattern: &Pattern<Math>, context: &'a Context) -> z3::ast::Ast<'a> {
-    // This is a simplified implementation - a real one would need to handle
-    // all Math operations and variable bindings
-    
-    // Create a map for variables
-    let mut var_map = std::collections::HashMap::new();
-    
-    fn convert_pattern<'a>(
-        pattern: &Pattern<Math>, 
-        context: &'a Context,
-        var_map: &mut std::collections::HashMap<String, z3::ast::Int<'a>>
-    ) -> z3::ast::Ast<'a> {
-        match pattern {
-            Pattern::Var(v) => {
-                // Handle variables by creating or reusing Z3 variables
-                if !var_map.contains_key(&v.to_string()) {
-                    let z3_var = Int::new_const(context, format!("var_{}", v));
-                    var_map.insert(v.to_string(), z3_var);
-                }
-                var_map.get(&v.to_string()).unwrap().clone().into()
-            },
-            Pattern::ENode(enode) => {
-                // Convert children recursively
-                let children: Vec<_> = enode.children().iter()
-                    .map(|child| convert_pattern(child, context, var_map))
-                    .collect();
+fn extract_lhs_rhs(rule: &Rewrite<Math, ()>) -> Option<(&RecExpr<Math>, &RecExpr<Math>)> {
+    match rule.name.as_str() {
+        // Handle rules in the format "(^2 ?a) => (* ?a ?a)"
+        name if name.contains("=>") => {
+            let parts: Vec<&str> = name.split("=>").collect();
+            if parts.len() == 2 {
+                let lhs_str = parts[0].trim();
+                let rhs_str = parts[1].trim();
                 
-                // Handle different operations
-                match enode.op {
-                    Math::Add => {
-                        let a = &children[0];
-                        let b = &children[1];
-                        a.add(b).into()
-                    },
-                    Math::Mul => {
-                        let a = &children[0];
-                        let b = &children[1];
-                        a.mul(b).into()
-                    },
-                    Math::Sub => {
-                        let a = &children[0];
-                        let b = &children[1];
-                        a.sub(b).into()
-                    },
-                    Math::Pow2 => {
-                        let a = &children[0];
-                        a.mul(a).into()
-                    },
-                    Math::Num(n) => {
-                        Int::from_i64(context, n as i64).into()
-                    },
-                    // Add other operations as needed
-                    _ => {
-                        // Default case for unsupported operations
-                        Int::from_i64(context, 0).into()
-                    }
-                }
+                // Parse the expressions using RecExpr::from_str
+                let lhs = RecExpr::<Math>::from_str(lhs_str).ok()?;
+                let rhs = RecExpr::<Math>::from_str(rhs_str).ok()?;
+                
+                return Some((&lhs, &rhs));
             }
         }
+        _ => {}
     }
-    
-    convert_pattern(pattern, context, &mut var_map)
+}
+fn expr_to_z3<'a>(expr: &RecExpr<Math>, ctx: &'a Context) -> Int<'a> {
+    let mut cache: Vec<Option<Int<'a>>> = vec![None; expr.as_ref().len()];
+    let mut var_map = std::collections::HashMap::new();
+
+    for (i, node) in expr.as_ref().iter().enumerate() {
+        let result = match node {
+            Math::Add([a, b]) => {
+                let a = cache[usize::from(*a)].as_ref().unwrap();
+                let b = cache[usize::from(*b)].as_ref().unwrap();
+                a + b
+            },
+            Math::Sub([a, b]) => {
+                let a = cache[usize::from(*a)].as_ref().unwrap();
+                let b = cache[usize::from(*b)].as_ref().unwrap();
+                a - b
+            },
+            Math::Mul([a, b]) => {
+                let a = cache[usize::from(*a)].as_ref().unwrap();
+                let b = cache[usize::from(*b)].as_ref().unwrap();
+                a * b
+            },
+            Math::Square(a) => {
+                let a = cache[usize::from(*a)].as_ref().unwrap();
+                a * a
+            },
+            Math::Inverse(a) => {
+                let a = cache[usize::from(*a)].as_ref().unwrap();
+                Int::new_const(ctx, format!("inv_{}", i)) * a
+            },
+            Math::Val(sym) => {
+                let s = sym.as_str();
+                if let Ok(n) = s.parse::<i64>() {
+                    Int::from_i64(ctx, n)
+                } else {
+                    var_map
+                        .entry(s.to_string())
+                        .or_insert_with(|| Int::new_const(ctx, s))
+                        .clone()
+                }
+            }
+        };
+        cache[i] = Some(result);
+    }
+
+    cache[expr.as_ref().len() - 1].as_ref().unwrap().clone()
 }
 
-/// Verifies all rules in a ruleset
-pub fn verify_ruleset(rules: &Vec<Rewrite<Math, ()>>) -> bool {
+
+pub fn verify_ruleset(rules: &[Rewrite<Math, ()>]) -> bool {
     let mut all_valid = true;
-    
     for rule in rules {
         if !verify_rule(rule) {
             all_valid = false;
-            println!("Rule verification failed: {}", rule.name());
+            println!("Rule verification failed: {}", rule.name);
         }
     }
-    
     all_valid
 }

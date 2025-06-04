@@ -1,0 +1,39 @@
+# Tuple2 Commutativity
+(+ (Tuple2 ?a ?b) (Tuple2 ?c ?d)) => (+ (Tuple2 ?c ?d) (Tuple2 ?a ?b))
+(* (Tuple2 ?a ?b) (Tuple2 ?c ?d)) => (* (Tuple2 ?c ?d) (Tuple2 ?a ?b))
+
+# Tuple2 Associativity
+(+ (Tuple2 ?a ?b) (+ (Tuple2 ?c ?d) (Tuple2 ?e ?f))) => (+ (+ (Tuple2 ?a ?b) (Tuple2 ?c ?d)) (Tuple2 ?e ?f))
+(* (Tuple2 ?a ?b) (* (Tuple2 ?c ?d) (Tuple2 ?e ?f))) => (* (* (Tuple2 ?a ?b) (Tuple2 ?c ?d)) (Tuple2 ?e ?f))
+
+# Tuple2 Distributivity
+(* (Tuple2 ?a ?b) (+ (Tuple2 ?c ?d) (Tuple2 ?e ?f))) => (+ (* (Tuple2 ?a ?b) (Tuple2 ?c ?d)) (* (Tuple2 ?a ?b) (Tuple2 ?e ?f)))
+(+ (* (Tuple2 ?a ?b) (Tuple2 ?c ?d)) (* (Tuple2 ?a ?b) (Tuple2 ?e ?f))) => (* (Tuple2 ?a ?b) (+ (Tuple2 ?c ?d) (Tuple2 ?e ?f)))
+
+# Tuple2 Addition Definition
+(+ (Tuple2 ?a ?b) (Tuple2 ?c ?d)) => (Tuple2 (+ ?a ?c) (+ ?b ?d))
+
+# Tuple2 Multiplication Definition
+(* (Tuple2 ?a ?b) (Tuple2 ?c ?d)) => (Tuple2 (+ (* ?a ?c) (* ?b ?d)) (+ (* ?a ?d) (* ?b ?c)))
+
+# Tuple2 Square Definition
+(^2 (Tuple2 ?a ?b)) => (Tuple2 (- (^2 ?a) (^2 ?b)) (* 2 (* ?a ?b)))
+(* (Tuple2 ?a ?b) (Tuple2 ?a ?b)) => (^2 (Tuple2 ?a ?b))
+
+# Tuple2 Identity Elements
+(+ (Tuple2 ?a ?b) (Tuple2 0 0)) => (Tuple2 ?a ?b)
+(+ (Tuple2 0 0) (Tuple2 ?a ?b)) => (Tuple2 ?a ?b)
+(* (Tuple2 ?a ?b) (Tuple2 1 0)) => (Tuple2 ?a ?b)
+(* (Tuple2 1 0) (Tuple2 ?a ?b)) => (Tuple2 ?a ?b)
+
+# Tuple2 Zero Multiplication
+(* (Tuple2 ?a ?b) (Tuple2 0 0)) => (Tuple2 0 0)
+(* (Tuple2 0 0) (Tuple2 ?a ?b)) => (Tuple2 0 0)
+
+# Tuple2 Subtraction
+(- (Tuple2 ?a ?b) (Tuple2 ?c ?d)) => (Tuple2 (- ?a ?c) (- ?b ?d))
+(- (Tuple2 ?a ?b) (Tuple2 0 0)) => (Tuple2 ?a ?b)
+(- (Tuple2 ?a ?b) (Tuple2 ?a ?b)) => (Tuple2 0 0)
+
+# Tuple2 Negation
+(* (Tuple2 -1 0) (Tuple2 ?a ?b)) => (Tuple2 (- 0 ?a) (- 0 ?b))
