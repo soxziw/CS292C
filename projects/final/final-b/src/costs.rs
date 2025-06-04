@@ -79,6 +79,7 @@ impl<'a> CryptoCost<'a> {
             Math::Val(_) => 0.0,
             Math::Inverse(_) => self.inv_cost,
             Math::Exp(_) => self.exp_cost,
+            _ => 0.0,
         }
     }
 }
@@ -108,6 +109,7 @@ impl<'a> egg::CostFunction<Math> for CryptoCost<'a> {
             Math::Val(_) => 0.0,
             Math::Inverse(_) => self.inv_cost + children_cost,
             Math::Exp(_) => self.exp_cost + children_cost,
+            Math::Fp2(_) => children_cost,
         }
     }
 }

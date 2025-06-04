@@ -9,6 +9,7 @@ define_language! {
         "^2" = Square(Id),
         "inv" = Inverse(Id),
         "**" = Exp([Id; 2]),
+        "Fp2" = Fp2([Id; 2]),
         Val(Symbol),
     }
 }
