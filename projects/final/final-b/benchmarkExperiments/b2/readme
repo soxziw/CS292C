@@ -1,0 +1,36 @@
+```
+Optimization Results:
+---------------------
+Original expression 0:
+(+
+  (* a0 a0)
+  (*
+    (* a1 a1)
+    x1))
+Optimized expression 0:
+(+
+  (^2 a0)
+  (*
+    (^2 a1)
+    x1))
+Original expression 1:
+(*
+  (* a0 2)
+  a1)
+Optimized expression 1:
+(*
+  a1
+  (+ a0 a0))
+Original total cost: 45
+Optimized cost: 34
+Improvement: 24.44%
+
+E-Graph Statistics:
+Iterations: 30
+Total e-graph nodes: 9264
+E-classes: 1719
+```
+
+Original cost 
+1 add
+3 muls

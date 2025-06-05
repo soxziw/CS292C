@@ -6,3 +6,4 @@ const_mul=50
 square=85
 mul=130
 inv=1200
+exp=2600

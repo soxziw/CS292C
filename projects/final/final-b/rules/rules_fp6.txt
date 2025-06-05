@@ -1,0 +1,63 @@
+# Commutativity
+(+ ?a ?b) => (+ ?b ?a)
+(* ?a ?b) => (* ?b ?a)
+
+# Associativity
+(+ ?a (+ ?b ?c)) => (+ (+ ?a ?b) ?c)
+(* ?a (* ?b ?c)) => (* (* ?a ?b) ?c)
+
+# Distributivity
+(* ?a (+ ?b ?c)) => (+ (* ?a ?b) (* ?a ?c))
+(+ (* ?a ?b) (* ?a ?c)) => (* ?a (+ ?b ?c))
+
+# Square identities
+(^2 ?a) => (* ?a ?a)
+(* ?a ?a) => (^2 ?a)
+
+# 2ab identity
+(* 2 (* ?a ?b)) => (- (^2 (+ ?a ?b)) (+ (^2 ?a) (^2 ?b)))
+(- (^2 (+ ?a ?b)) (+ (^2 ?a) (^2 ?b))) => (* 2 (* ?a ?b))
+
+# Karatsuba multiplication
+(+ (* ?a ?d) (* ?b ?c)) => (- (* (+ ?a ?b) (+ ?c ?d)) (+ (* ?a ?c) (* ?b ?d)))
+
+# V Square
+(^2 V) => xi
+
+# inversion
+xi => (inv xi)
+(inv xi) => (^2 V)
+
+# DEPRECATED
+# Fp6_a
+# (** Fp2_a (- p2 2))
+# f = g + hw; fi ∈ Fp6 . And g = g0 + g1v + g2v2; h =h0 + h1v + h2v2
+# v is a constant
+# Fp6_a => (+ (+ (+ g0 (* g1 v)) (* g2 (^2 v))) (* (+ (+ (h0) (* h1 v)) (* h2 (^2 v))) w))
+
+# DEPRECATED
+# input: (** p (+ (- (** p 4) (** p 2)) 1))
+# output: frobenius rewrites
+# so p^p^4 * p^-p^2 * p^1
+# = p^1 * p^p^4 * inv(p^p^2)
+# 3 parts p^1, p^p^4, p^p^2 
+# section 3.2
+# p^1 =
+# p^1 => f - hw because conjugation
+# g0 - h0 * gamma11 * w + g1 * gamma12 * w^2 - h1 * gamma13 * w^3 + g2 * gamma14 * w^4 - h2 * gamma15 * w^5
+# section 3.2 and because frob maps in tower fields, its more about how to scale each factor
+# p^p^4 = 
+# g0 + h0 * gamma41 * w + g1 * gamma42 * w^2 + h1 * gamma43 * w^3 + g2 * gamma44 * w^4 + h2 * gamma45 * w^5
+# Alg 28
+# p^p^2 =
+# g0 + h0 * gamma21 * w + g1 * gamma22 * w^2 + h1 * gamma23 * w^3 + g2 * gamma24 * w^4 + h2 * gamma25 * w^5
+# SEXPR:
+# (** (+ (+ (+ ?g0 (* ?g1 ?v)) (* ?g2 (^2 ?v))) (* (+ (+ ?h0 (* ?h1 v)) (* ?h2 (^2 ?v))) w)) (+ (- (** (+ (+ (+ ?g0 (* ?g1 ?v)) (* ?g2 (^2 ?v))) (* (+ (+ ?h0 (* ?h1 v)) (* ?h2 (^2 ?v))) w)) 4) (** (+ (+ (+ ?g0 (* ?g1 ?v)) (* ?g2 (^2 ?v))) (* (+ (+ ?h0 (* ?h1 v)) (* ?h2 (^2 ?v))) w)) 2)) 1)) => (* (+ ?g0 (+ (* -1 (* ?h0 gamma11)) (+ (* ?g1 gamma12) (+ (* -1 (* ?h1 gamma13)) (+ (* ?g2 gamma14) (* -1 (* ?h2 gamma15))))))) (* (+ ?g0 (+ (* ?h0 gamma41) (+ (* ?g1 gamma42) (+ (* ?h1 gamma43) (+ (* ?g2 gamma44) (* ?h2 gamma45)))))) (inv (+ ?g0 (+ (* ?h0 gamma21) (+ (* ?g1 gamma22) (+ (* ?h1 gamma23) (+ (* ?g2 gamma24) (* ?h2 gamma25)))))))))
+
+
+# input: (** (Fp6 g0 g1 g2 h0 h1 h2) (+ (- (** (Fp6 g0 g1 g2 h0 h1 h2) 4) (** (Fp6 g0 g1 g2 h0 h1 h2) 2)) 1))
+# output:
+# (Fp6 g0 ( 0 - (h0 * gamma11 * w)) (g1 * gamma12 * w^2) (0 - (h1 * gamma13 * w^3)) (g2 * gamma14 * w^4) (0 - (h2 * gamma15 * w^5))) *
+# inv (Fp6 g0 (h0 * gamma21 * w) (g1 * gamma22 * w^2) (h1 * gamma23 * w^3) (g2 * gamma24 * w^4) (h2 * gamma25 * w^5)) * 
+# (Fp6 g0 (h0 * gamma41 * w) (g1 * gamma42 * w^2) (h1 * gamma43 * w^3) (g2 * gamma44 * w^4) (h2 * gamma45 * w^5))
+(** (Fp6 ?g0 ?g1 ?g2 ?h0 ?h1 ?h2) (+ (- (** (Fp6 ?g0 ?g1 ?g2 ?h0 ?h1 ?h2) 4) (** (Fp6 ?g0 ?g1 ?g2 ?h0 ?h1 ?h2) 2)) 1)) => (* (* (Fp6 ?g0 (- 0 (* ?h0 (* gamma11 w))) (* ?g1 (* gamma12 (** w 2))) (- 0 (* ?h1 (* gamma13 (** w 3)))) (* ?g2 (* gamma14 (** w 4))) (- 0 (* ?h2 (* gamma15 (** w 5))))) (inv (Fp6 ?g0 (* ?h0 (* gamma21 w)) (* ?g1 (* gamma22 (** w 2))) (* ?h1 (* gamma23 (** w 3))) (* ?g2 (* gamma24 (** w 4))) (* ?h2 (* gamma25 (** w 5))))) ) (Fp6 ?g0 (* ?h0 (* gamma41 w)) (* ?g1 (* gamma42 (** w 2))) (* ?h1 (* gamma43 (** w 3))) (* ?g2 (* gamma44 (** w 4))) (* ?h2 (* gamma45 (** w 5)))))
