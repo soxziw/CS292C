@@ -1,7 +1,6 @@
-use egg::{EGraph, Id, Pattern, RecExpr, Rewrite};
+use egg::{RecExpr, Rewrite};
 use z3::{Config, Context, Solver, ast::{Ast, Int}};
 use crate::math::Math;
-use crate::rules::{default_rules, load_rules_from_file};
 use std::str::FromStr;
 
 pub fn verify_rule(rule: &Rewrite<Math, ()>) -> bool {

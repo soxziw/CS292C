@@ -32,7 +32,6 @@ pub fn is_const_from_expr(expr: &RecExpr<Math>, id: &Id) -> bool {
         Math::Val(sym) => {
             let name = sym.as_str();
             // Check if it's a number or one of the special variables
-            println!("Checking if {} is a constant", name);
             name == "xi" || name == "gamma" || name == "beta" || name.parse::<i32>().is_ok()
         },
         _ => false
